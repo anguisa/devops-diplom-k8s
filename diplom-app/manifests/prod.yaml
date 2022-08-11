@@ -1,0 +1,74 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    qbec.io/component: app-ingress
+  labels:
+    qbec.io/application: diplom-app
+    qbec.io/environment: prod
+  name: app-ingress
+  namespace: prod
+spec:
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: diplom-svc
+            port:
+              name: http
+        path: /app
+        pathType: Prefix
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    qbec.io/component: app-service
+  labels:
+    qbec.io/application: diplom-app
+    qbec.io/environment: prod
+  name: diplom-svc
+  namespace: prod
+spec:
+  clusterIP: None
+  ports:
+  - name: http
+    port: 8000
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: diplom
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    qbec.io/component: app
+  labels:
+    app: diplom
+    qbec.io/application: diplom-app
+    qbec.io/environment: prod
+  name: diplom
+  namespace: prod
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: diplom
+  template:
+    metadata:
+      labels:
+        app: diplom
+    spec:
+      containers:
+      - image: anguisa/diplom_app:1.0.0
+        imagePullPolicy: IfNotPresent
+        name: diplom-app
+      terminationGracePeriodSeconds: 30
+

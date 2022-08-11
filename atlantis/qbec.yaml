@@ -1,0 +1,25 @@
+apiVersion: qbec.io/v1alpha1
+kind: App
+metadata:
+  name: atlantis
+spec:
+  environments:
+    stage:
+      defaultNamespace: stage
+      server: https://127.0.0.1:12345
+      includes:
+        - atlantis
+        - atlantis-ingress
+        - atlantis-service
+    prod:
+      defaultNamespace: prod
+      server: https://127.0.0.1:12345
+      includes:
+        - atlantis
+        - atlantis-ingress
+        - atlantis-service
+  vars: {}
+  excludes:
+    - atlantis
+    - atlantis-ingress
+    - atlantis-service

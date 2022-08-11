@@ -1,0 +1,170 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /events
+    qbec.io/component: atlantis-ingress
+  labels:
+    qbec.io/application: atlantis
+    qbec.io/environment: stage
+  name: atlantis-ingress
+  namespace: stage
+spec:
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: atlantis
+            port:
+              name: atlantis
+        path: /atlantis
+        pathType: Prefix
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    qbec.io/component: atlantis-service
+  labels:
+    qbec.io/application: atlantis
+    qbec.io/environment: stage
+  name: atlantis
+  namespace: stage
+spec:
+  ports:
+  - name: atlantis
+    port: 80
+    targetPort: 4141
+  selector:
+    app: atlantis
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  annotations:
+    qbec.io/component: atlantis
+  labels:
+    qbec.io/application: atlantis
+    qbec.io/environment: stage
+  name: atlantis
+  namespace: stage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: atlantis
+  serviceName: atlantis
+  template:
+    metadata:
+      labels:
+        app: atlantis
+    spec:
+      containers:
+      - env:
+        - name: ATLANTIS_REPO_ALLOWLIST
+          value: github.com/anguisa/devops-diplom-terraform
+        - name: ATLANTIS_GH_USER
+          value: anguisa
+        - name: ATLANTIS_GH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: token
+              name: atlantis-vcs
+        - name: ATLANTIS_GH_WEBHOOK_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: webhook-secret
+              name: atlantis-vcs
+        - name: ATLANTIS_DATA_DIR
+          value: /atlantis
+        - name: ATLANTIS_PORT
+          value: "4141"
+        - name: ATLANTIS_REPO_CONFIG_JSON
+          value: '{"repos":[{"id":"/.*/","allowed_overrides":["apply_requirements","workflow","delete_source_branch_on_merge"],"allow_custom_workflows":true,"delete_source_branch_on_merge":true}]}'
+        - name: YC_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: token
+              name: atlantis-yc
+        - name: YC_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              key: access_key_id
+              name: atlantis-yc
+        - name: YC_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              key: secret_access_key
+              name: atlantis-yc
+        image: ghcr.io/runatlantis/atlantis:v0.19.7
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - |-
+                echo "provider_installation {
+                 network_mirror {
+                  url = \"https://terraform-mirror.yandexcloud.net/\"
+                  include = [\"registry.terraform.io/*/*\"]
+                 }
+                 direct {
+                  exclude = [\"registry.terraform.io/*/*\"]
+                 }
+                }" > /home/atlantis/.terraformrc
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 4141
+            scheme: HTTP
+          periodSeconds: 60
+        name: atlantis
+        ports:
+        - containerPort: 4141
+          name: atlantis
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 4141
+            scheme: HTTP
+          periodSeconds: 60
+        resources:
+          limits:
+            cpu: 100m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        volumeMounts:
+        - mountPath: /atlantis
+          name: atlantis-data
+        - mountPath: /home/atlantis/.ssh/id_rsa_ya.pub
+          name: atlantis-ssh-vol
+          subPath: id_rsa_ya.pub
+      securityContext:
+        fsGroup: 1000
+      volumes:
+      - configMap:
+          name: atlantis-ssh
+        name: atlantis-ssh-vol
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
+  volumeClaimTemplates:
+  - metadata:
+      name: atlantis-data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 5Gi
+      storageClassName: nfs
+

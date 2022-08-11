@@ -1,0 +1,25 @@
+apiVersion: qbec.io/v1alpha1
+kind: App
+metadata:
+  name: diplom-app
+spec:
+  environments:
+    stage:
+      defaultNamespace: stage
+      server: https://127.0.0.1:12345
+      includes:
+        - app
+        - app-ingress
+        - app-service
+    prod:
+      defaultNamespace: prod
+      server: https://127.0.0.1:12345
+      includes:
+        - app
+        - app-ingress
+        - app-service
+  vars: {}
+  excludes:
+    - app
+    - app-ingress
+    - app-service

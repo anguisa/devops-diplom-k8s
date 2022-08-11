@@ -1,0 +1,215 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    qbec.io/component: jenkins-server-ingress
+  labels:
+    qbec.io/application: jenkins
+    qbec.io/environment: stage
+  name: jenkins-server-ingress
+  namespace: jenkins
+spec:
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: jenkins-server
+            port:
+              name: jenkins-server
+        path: /jenkins
+        pathType: Prefix
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    qbec.io/component: jenkins-server-service
+  labels:
+    qbec.io/application: jenkins
+    qbec.io/environment: stage
+  name: jenkins-server
+  namespace: jenkins
+spec:
+  ports:
+  - name: jenkins-server
+    port: 80
+    targetPort: 8080
+  selector:
+    app: jenkins-server
+  type: ClusterIP
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  annotations:
+    qbec.io/component: jenkins-server
+  labels:
+    qbec.io/application: jenkins
+    qbec.io/environment: stage
+  name: jenkins-admin
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - '*'
+  verbs:
+  - '*'
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  annotations:
+    qbec.io/component: jenkins-server
+  labels:
+    qbec.io/application: jenkins
+    qbec.io/environment: stage
+  name: jenkins-agent
+rules:
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  - pods
+  - daemonsets
+  verbs:
+  - get
+  - list
+  - watch
+  - patch
+- apiGroups:
+  - '*'
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  annotations:
+    qbec.io/component: jenkins-server
+  labels:
+    qbec.io/application: jenkins
+    qbec.io/environment: stage
+  name: jenkins-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: jenkins-admin
+subjects:
+- kind: ServiceAccount
+  name: jenkins-admin
+  namespace: jenkins
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  annotations:
+    qbec.io/component: jenkins-server
+  labels:
+    qbec.io/application: jenkins
+    qbec.io/environment: stage
+  name: jenkins-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: jenkins-agent
+subjects:
+- kind: ServiceAccount
+  name: jenkins-agent
+  namespace: jenkins
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    qbec.io/component: jenkins-server
+  labels:
+    qbec.io/application: jenkins
+    qbec.io/environment: stage
+  name: jenkins-server
+  namespace: jenkins
+spec:
+  selector:
+    matchLabels:
+      app: jenkins-server
+  template:
+    metadata:
+      labels:
+        app: jenkins-server
+    spec:
+      containers:
+      - env:
+        - name: JENKINS_OPTS
+          value: --prefix=/jenkins
+        image: jenkins/jenkins:lts-jdk11
+        imagePullPolicy: IfNotPresent
+        name: jenkins-server
+        ports:
+        - containerPort: 8080
+        replicas: 1
+        volumeMounts:
+        - mountPath: /var/jenkins_home
+          name: jenkins-server-home
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+      serviceAccountName: jenkins-admin
+      volumes:
+      - name: jenkins-server-home
+        persistentVolumeClaim:
+          claimName: jenkins-server-disk
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    qbec.io/component: jenkins-server
+  labels:
+    qbec.io/application: jenkins
+    qbec.io/environment: stage
+  name: jenkins-server-disk
+  namespace: jenkins
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: nfs
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    qbec.io/component: jenkins-server
+  labels:
+    qbec.io/application: jenkins
+    qbec.io/environment: stage
+  name: jenkins-admin
+  namespace: jenkins
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    qbec.io/component: jenkins-server
+  labels:
+    qbec.io/application: jenkins
+    qbec.io/environment: stage
+  name: jenkins-agent
+  namespace: jenkins
+

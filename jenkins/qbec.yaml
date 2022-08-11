@@ -1,0 +1,25 @@
+apiVersion: qbec.io/v1alpha1
+kind: App
+metadata:
+  name: jenkins
+spec:
+  environments:
+    stage:
+      defaultNamespace: stage
+      server: https://127.0.0.1:12345
+      includes:
+        - jenkins-server
+        - jenkins-server-ingress
+        - jenkins-server-service
+    prod:
+      defaultNamespace: prod
+      server: https://127.0.0.1:12345
+      includes:
+        - jenkins-server
+        - jenkins-server-ingress
+        - jenkins-server-service
+  vars: {}
+  excludes:
+    - jenkins-server
+    - jenkins-server-ingress
+    - jenkins-server-service
